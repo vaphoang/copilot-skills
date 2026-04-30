@@ -17,3 +17,4 @@ argument-hint: "[optional: commit message]"
 **Usage:**  
 1. Run: [scripts/squash-branch-commits.sh](./scripts/squash-branch-commits.sh) `[commit message]`  
 2. Report resulting commit SHA and recommended push command.
+
