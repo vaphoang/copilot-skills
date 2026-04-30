@@ -15,6 +15,5 @@ argument-hint: "[optional: commit message]"
 - After squashing, remind user to push with `--force-with-lease` if needed.
 
 **Usage:**  
-1. Run: [scripts/squash-branch-commits.sh](./scripts/squash-branch-commits.sh) `[commit message]`  
+1. Run: ./squash-branch-commits.sh `[commit message]`  
 2. Report resulting commit SHA and recommended push command.
-
