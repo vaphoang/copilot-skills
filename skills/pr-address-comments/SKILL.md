@@ -2,7 +2,7 @@
 name: pr-address-comments
 description: |
   Address PR review feedback: fix in-scope issues, reply, and resolve fixed bot threads.
-version: 1.2.3
+version: 1.2.4
 triggers:
   - address pr comments
   - address reviews
@@ -58,12 +58,12 @@ gh api graphql -f query='query {
 
 2) **Ask which items to address before any edits**.
 - Summarize candidates with stable IDs: top-level reviews `R:<reviewId>`, unresolved threads `T:<threadId>`.
-- If checkbox-style multi-select is available, use it with one option per item labeled `[ID] short summary`, plus selectable `all` and `skip`.
-- Structured prompt text: `I found N candidate review items. Which should I address now?`
-- Selection rules: checked items = selected scope; `all` = every item; `skip` = no action; if `all` and specific items are both selected, treat it as `all`.
+- Use a structured multi-select prompt (e.g., `ask_questions` with `multiSelect: true`) if available. Create options for each candidate item labeled `[ID] short summary`, plus `all` and `skip`.
+- Prompt header: `I found N candidate review items. Which should I address now?`
+- Selection rules: selected items = scope to address; `all` = every candidate; `skip` = no action; if `all` is selected alongside specific items, treat as `all`.
 - Use plain-text selection only if structured multi-select is unavailable:
   - `I found N candidate review items: [list IDs + short summary]. Which should I address now? Reply with: all | ids:<comma-separated IDs> | skip`
-- Allowed fallback responses: `all`, `ids:R:<id>,T:<id>,...`, `skip` (example: `ids:R:PRR_kwDOAA12ab4,T:PRRT_kwDOAA12ab8`). Ignore unknown IDs and report them before proceeding.
+- Fallback responses (plain-text only): `all`, `ids:R:<id>,T:<id>,...`, `skip` (example: `ids:R:PRR_kwDOAA12ab4,T:PRRT_kwDOAA12ab8`). Ignore unknown IDs and report them before proceeding.
 - If the response is unclear or empty, ask one clarification; if still unclear, treat as `skip`.
 - Do not modify code, reply, or resolve anything until scope is confirmed.
 
