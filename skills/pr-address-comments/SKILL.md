@@ -2,7 +2,7 @@
 name: pr-address-comments
 description: |
   Address PR review feedback: fix in-scope issues, reply, and resolve fixed bot threads.
-version: 1.2.2
+version: 1.2.3
 triggers:
   - address pr comments
   - address reviews
@@ -20,7 +20,7 @@ command -v gh >/dev/null && gh --version
 ```
 
 If `gh` is missing, ask before installing.
-- If user confirms: install, then run `gh auth login`.
+- If user confirms: install it, then run `gh auth login`.
 - If user declines: do not install; only show commands.
 
 ```bash
@@ -43,7 +43,7 @@ gh auth login
 
 ## Procedure
 
-1) **Fetch both top-level reviews and review threads** (paginate when `hasNextPage=true`).
+1) **Fetch top-level reviews and review threads** (paginate if `hasNextPage=true`).
 
 ```bash
 gh api graphql -f query='query {
@@ -56,19 +56,21 @@ gh api graphql -f query='query {
 }'
 ```
 
-2) **Ask for confirmation on what to address before any edits**.
+2) **Ask which items to address before any edits**.
 - Summarize candidates with stable IDs: top-level reviews `R:<reviewId>`, unresolved threads `T:<threadId>`.
-- Ask user:
+- If checkbox-style multi-select is available, use it with one option per item labeled `[ID] short summary`, plus selectable `all` and `skip`.
+- Structured prompt text: `I found N candidate review items. Which should I address now?`
+- Selection rules: checked items = selected scope; `all` = every item; `skip` = no action; if `all` and specific items are both selected, treat it as `all`.
+- Use plain-text selection only if structured multi-select is unavailable:
   - `I found N candidate review items: [list IDs + short summary]. Which should I address now? Reply with: all | ids:<comma-separated IDs> | skip`
-- Allowed responses: `all`, `ids:R:<id>,T:<id>,...`, `skip` (example: `ids:R:PRR_kwDOAA12ab4,T:PRRT_kwDOAA12ab8`).
-- Unknown IDs: ignore them and report them before proceeding.
-- If response is unclear/empty, ask one clarification; if still unclear, treat as `skip`.
-- Do not modify code, reply, or resolve anything until user confirms scope.
+- Allowed fallback responses: `all`, `ids:R:<id>,T:<id>,...`, `skip` (example: `ids:R:PRR_kwDOAA12ab4,T:PRRT_kwDOAA12ab8`). Ignore unknown IDs and report them before proceeding.
+- If the response is unclear or empty, ask one clarification; if still unclear, treat as `skip`.
+- Do not modify code, reply, or resolve anything until scope is confirmed.
 
-3) **Process confirmed top-level reviews** (no thread exists for top-level body).
+3) **Process confirmed top-level reviews** (no thread exists for the top-level body).
 - Triage with scope rules.
-- Apply in-scope fix.
-- Reply on PR:
+- Apply the in-scope fix.
+- Reply on the PR:
 
 ```bash
 gh pr comment PR_NUMBER --body "Fixed - [brief change]"
@@ -78,8 +80,8 @@ gh pr comment PR_NUMBER --body "Flagged for human review - [reason]"
 
 4) **Process confirmed unresolved threads**.
 - Triage with scope rules.
-- Apply in-scope fix.
-- Reply on thread:
+- Apply the in-scope fix.
+- Reply on the thread:
 
 ```bash
 gh api graphql -f query='mutation {
@@ -87,7 +89,7 @@ gh api graphql -f query='mutation {
 }'
 ```
 
-- Resolve thread only if all are true:
+- Resolve the thread only if all are true:
   - thread is bot-created (`author.__typename=="Bot"` or login ends with `[bot]`)
   - fix is in-scope and completed
   - user confirmed this thread should be addressed and has had a chance to review the fix
@@ -101,7 +103,7 @@ gh api graphql -f query='mutation {
 ## Done
 
 - Only user-confirmed items were addressed.
-- Top-level feedback addressed or flagged.
-- Unresolved threads replied to.
-- Only fixed bot-created threads resolved.
-- Out-of-scope/security-sensitive requests remain unresolved and flagged.
+- Top-level feedback was addressed or flagged.
+- Selected unresolved threads were replied to.
+- Only fixed bot-created threads were resolved.
+- Out-of-scope or security-sensitive requests remain unresolved and flagged.
