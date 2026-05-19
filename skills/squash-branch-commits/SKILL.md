@@ -12,8 +12,11 @@ argument-hint: "[optional: commit message]"
 - Never run on protected branches (`main`, `master`, `develop`, `release/*`) unless user insists.
 - Show base branch, merge-base, and current branch before squashing.
 - Abort if uncommitted changes exist.
-- After squashing, remind user to push with `--force-with-lease` if needed.
+- After squashing, ask for confirmation before any force push (for example: `Force push this branch now with --force-with-lease? [y/N]`).
+- If user confirms, run the force push command; if user declines or is unclear, do not push and only show the command they can run later.
 
 **Usage:**  
 1. Run: ./squash-branch-commits.sh `[commit message]`  
-2. Report resulting commit SHA and recommended push command.
+2. Report resulting commit SHA.
+3. Ask whether to run `git push --force-with-lease` now.
+4. If confirmed, run it and report the result; otherwise, provide the command only.
