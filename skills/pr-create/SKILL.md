@@ -2,7 +2,7 @@
 name: pr-create
 description: |
   Create a new pull request in a GitHub repository.
-version: 1.0.0
+version: 1.1.0
 triggers:
   - create pr
   - create pull request
@@ -42,8 +42,9 @@ gh auth login
   ```
 - If uncommitted changes exist, warn the user: "Uncommitted changes detected. Stash or commit them before squashing to avoid including them in the squashed commit."
 - Ask if the user wants to squash commits in the branch before creating the PR.
-- If yes, use `git rebase -i` or rely on a squash-commits skill if available to squash all commits since the branch diverged from base.
-- After squashing, verify the user is ready to proceed.
+- If yes, use `git rebase -i` or rely on the `squash-branch-commits` skill to squash all commits since the branch diverged from base.
+- If squashing rewrites history, ask for explicit confirmation before any `git push --force-with-lease`; if declined or unclear, do not push and only show the command.
+- After squashing (and any confirmed push), verify the user is ready to proceed.
 
 1) **Gather PR details from the user**.
 - Current repository (auto-detected or provided).
@@ -55,11 +56,12 @@ gh auth login
   - If it exists, use it as the default body and ask the user if they want to modify it.
   - If it does not exist, ask the user for the body (optional).
 - Draft status (optional; default: false).
+- Assignee: always set to the PR creator (`@me`).
 - Assign reviewers (optional).
 - Assign labels (optional).
 
 2) **Show user a summary before creating**.
-- Display repo, base, head, title, body, draft status, reviewers, and labels.
+- Display repo, base, head, title, body, draft status, assignee (`@me`), reviewers, and labels.
 - Ask for confirmation: `Create PR with the above details? [y/N]`
 - If the response is unclear or empty, ask one clarification; if still unclear, treat as `N` (do not create).
 - If user declines, do not create anything.
@@ -71,7 +73,8 @@ gh pr create \
   --base BASE_BRANCH \
   --head HEAD_BRANCH \
   --title "PR Title" \
-  --body "PR description"
+  --body "PR description" \
+  --assignee "@me"
 # Optional flags (include only if user selected them):
 # --draft \
 # --reviewer reviewer1,reviewer2 \
