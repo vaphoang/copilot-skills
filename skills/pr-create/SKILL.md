@@ -2,7 +2,7 @@
 name: pr-create
 description: |
   Create a new pull request in a GitHub repository.
-version: 1.1.0
+version: 1.2.0
 triggers:
   - create pr
   - create pull request
@@ -52,9 +52,11 @@ gh auth login
 - Head branch (current branch or specified branch).
 - Title (required; if not provided, ask for it).
 - Body/description:
-  - Check if `.github/PULL_REQUEST_TEMPLATE.md` exists in the repository.
-  - If it exists, use it as the default body and ask the user if they want to modify it.
-  - If it does not exist, ask the user for the body (optional).
+  - In every session, check whether a PR template exists (for example: `.github/PULL_REQUEST_TEMPLATE.md`, `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, or `docs/PULL_REQUEST_TEMPLATE.md`).
+  - If a template exists, read it and keep its structure (headings/checklists) intact.
+  - Try to pre-fill each template section from available session context (user prompt, branch name, commit history, and changed files).
+  - For sections that cannot be inferred confidently, leave a clear placeholder (for example: `TODO`) and ask focused follow-up questions.
+  - If no template exists, ask the user for the body (optional).
 - Draft status (optional; default: false).
 - Assignee: always set to the PR creator (`@me`).
 - Assign reviewers (optional).
@@ -62,6 +64,7 @@ gh auth login
 
 2) **Show user a summary before creating**.
 - Display repo, base, head, title, body, draft status, assignee (`@me`), reviewers, and labels.
+- If a template was used, show what was auto-filled and what still needs user input.
 - Ask for confirmation: `Create PR with the above details? [y/N]`
 - If the response is unclear or empty, ask one clarification; if still unclear, treat as `N` (do not create).
 - If user declines, do not create anything.
@@ -73,13 +76,15 @@ gh pr create \
   --base BASE_BRANCH \
   --head HEAD_BRANCH \
   --title "PR Title" \
-  --body "PR description" \
+  --body-file PR_BODY_FILE \
   --assignee "@me"
 # Optional flags (include only if user selected them):
 # --draft \
 # --reviewer reviewer1,reviewer2 \
 # --label label1,label2
 ```
+
+- Use `--body-file` when the body comes from a template or contains multiline markdown.
 
 4) **Show the result**.
 - Display PR number, URL, and status.
