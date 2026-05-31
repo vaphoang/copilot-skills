@@ -2,7 +2,7 @@
 name: pr-create
 description: |
   Create a new pull request in a GitHub repository.
-version: 1.2.0
+version: 1.2.1
 triggers:
   - create pr
   - create pull request
@@ -54,9 +54,17 @@ gh auth login
 - Body/description:
   - In every session, check whether a PR template exists (for example: `.github/PULL_REQUEST_TEMPLATE.md`, `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, or `docs/PULL_REQUEST_TEMPLATE.md`).
   - If a template exists, read it and keep its structure (headings/checklists) intact.
+  - If the template contains checkbox items, preserve all checkbox lines exactly (do not remove or rewrite them).
+  - Tick only the checkbox(es) that are clearly appropriate from confirmed context; leave all others unchecked.
+  - For mutually exclusive checkbox groups (for example, PR type), ensure exactly one appropriate option is checked and the remaining options stay unchecked.
+  - Keep checkbox edits minimal and local (flip `[ ]` to `[x]` only where needed) to avoid unnecessary body rewrites.
   - Try to pre-fill each template section from available session context (user prompt, branch name, commit history, and changed files).
   - For sections that cannot be inferred confidently, leave a clear placeholder (for example: `TODO`) and ask focused follow-up questions.
   - If no template exists, ask the user for the body (optional).
+
+  Example (mutually exclusive PR type):
+  - Before: `- [ ] Bug fix` `- [ ] Feature` `- [ ] Chore`
+  - After:  `- [ ] Bug fix` `- [x] Feature` `- [ ] Chore`
 - Draft status (optional; default: false).
 - Assignee: always set to the PR creator (`@me`).
 - Assign reviewers (optional).
