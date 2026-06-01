@@ -2,7 +2,7 @@
 name: pr-create
 description: |
   Create a new pull request in a GitHub repository.
-version: 1.2.2
+version: 1.3.0
 triggers:
   - create pr
   - create pull request
@@ -32,6 +32,11 @@ sudo apt update && sudo apt install gh
 winget install --id GitHub.cli
 gh auth login
 ```
+
+## Interaction Rules
+
+- **Optional prompts**: whenever a field is optional (user may skip it), present it as a select box using `ask_questions` with predefined options. Always include **"None — skip this"** as the first or last option. Never rely on the user leaving a field blank to signal "skip".
+- **Required prompts**: show the auto-generated or detected value and ask the user to confirm, edit, or replace it.
 
 ## Procedure
 
@@ -65,10 +70,10 @@ gh auth login
   Example (mutually exclusive PR type):
   - Before: `- [ ] Bug fix` `- [ ] Feature` `- [ ] Chore`
   - After:  `- [ ] Bug fix` `- [x] Feature` `- [ ] Chore`
-- Draft status (optional; default: false).
+- Draft status (optional): use a select box — options: `Yes (draft)` | `No (ready for review)` | `None — skip (default: No)`.
 - Assignee: always set to the PR creator (`@me`).
-- Assign reviewers (optional): present a list of suggestions if available, always include a **"None"** option (no reviewers); if the user selects "None" or leaves blank, omit the `--reviewer` flag entirely.
-- Assign labels (optional): present a list of available labels if detectable, always include a **"None"** option (no labels); if the user selects "None" or leaves blank, omit the `--label` flag entirely.
+- Assign reviewers (optional): use a select box populated with suggested reviewers (from git history or CODEOWNERS if available); always include **"None — no reviewers"** as an option; if selected or no input, omit `--reviewer`.
+- Assign labels (optional): use a select box populated with available repo labels if detectable; always include **"None — no labels"** as an option; if selected or no input, omit `--label`.
 
 2) **Show user a summary before creating**.
 - Display repo, base, head, title, body, draft status, assignee (`@me`), reviewers, and labels.
