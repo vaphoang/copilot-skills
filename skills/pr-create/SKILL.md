@@ -2,7 +2,7 @@
 name: pr-create
 description: |
   Create a new pull request in a GitHub repository.
-version: 1.2.1
+version: 1.2.2
 triggers:
   - create pr
   - create pull request
@@ -50,7 +50,7 @@ gh auth login
 - Current repository (auto-detected or provided).
 - Base branch (default: repository's default branch, usually `main`, `master`, or `develop`).
 - Head branch (current branch or specified branch).
-- Title (required; if not provided, ask for it).
+- Title (required): auto-generate a succinct title (≤72 chars, imperative mood, no trailing period) from the branch name, commit messages, and changed files; present it to the user for confirmation or edit before proceeding.
 - Body/description:
   - In every session, check whether a PR template exists (for example: `.github/PULL_REQUEST_TEMPLATE.md`, `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, or `docs/PULL_REQUEST_TEMPLATE.md`).
   - If a template exists, read it and keep its structure (headings/checklists) intact.
@@ -67,8 +67,8 @@ gh auth login
   - After:  `- [ ] Bug fix` `- [x] Feature` `- [ ] Chore`
 - Draft status (optional; default: false).
 - Assignee: always set to the PR creator (`@me`).
-- Assign reviewers (optional).
-- Assign labels (optional).
+- Assign reviewers (optional): present a list of suggestions if available, always include a **"None"** option (no reviewers); if the user selects "None" or leaves blank, omit the `--reviewer` flag entirely.
+- Assign labels (optional): present a list of available labels if detectable, always include a **"None"** option (no labels); if the user selects "None" or leaves blank, omit the `--label` flag entirely.
 
 2) **Show user a summary before creating**.
 - Display repo, base, head, title, body, draft status, assignee (`@me`), reviewers, and labels.
