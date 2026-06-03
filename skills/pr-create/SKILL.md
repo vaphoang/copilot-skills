@@ -2,7 +2,7 @@
 name: pr-create
 description: |
   Create a new pull request in a GitHub repository.
-version: 1.3.0
+version: 1.5.0
 triggers:
   - create pr
   - create pull request
@@ -58,18 +58,54 @@ gh auth login
 - Title (required): auto-generate a succinct title (≤72 chars, imperative mood, no trailing period) from the branch name, commit messages, and changed files; present it to the user for confirmation or edit before proceeding.
 - Body/description:
   - In every session, check whether a PR template exists (for example: `.github/PULL_REQUEST_TEMPLATE.md`, `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, or `docs/PULL_REQUEST_TEMPLATE.md`).
-  - If a template exists, read it and keep its structure (headings/checklists) intact.
-  - If the template contains checkbox items, preserve all checkbox lines exactly (do not remove or rewrite them).
-  - Tick only the checkbox(es) that are clearly appropriate from confirmed context; leave all others unchecked.
-  - For mutually exclusive checkbox groups (for example, PR type), ensure exactly one appropriate option is checked and the remaining options stay unchecked.
-  - Keep checkbox edits minimal and local (flip `[ ]` to `[x]` only where needed) to avoid unnecessary body rewrites.
-  - Try to pre-fill each template section from available session context (user prompt, branch name, commit history, and changed files).
-  - For sections that cannot be inferred confidently, leave a clear placeholder (for example: `TODO`) and ask focused follow-up questions.
+  - If a template exists, follow the **copy-then-edit** workflow below. **Never write the body from scratch or memory.**
   - If no template exists, ask the user for the body (optional).
 
+  **Copy-then-edit workflow (MANDATORY when a template exists):**
+
+  You **must** use `skills/pr-create/pr-body-fill.sh` to produce the body. Hand-writing the body is not permitted because it cannot guarantee checkbox preservation.
+
+  1. **Build a config JSON** at `/tmp/pr-body-config.json` with the sections you want filled and the checkbox labels you want ticked:
+     ```json
+     {
+       "sections": [
+         { "heading": "## Summary", "content": "Free-form markdown body." }
+       ],
+       "checks": ["Feature", "Tests added"]
+     }
+     ```
+     - `heading` must match the template heading line exactly (including `##` level).
+     - `checks` are case-insensitive substrings matched against checkbox labels. Only ticked items that are clearly appropriate from confirmed context.
+     - For sections that cannot be inferred confidently, set `content` to `"TODO"` and ask focused follow-up questions.
+
+  2. **Run the script** — it copies the template, fills sections, ticks checkboxes, and aborts if any checkbox would be lost:
+     ```bash
+     skills/pr-create/pr-body-fill.sh \
+       --template <PATH_TO_TEMPLATE> \
+       --config   /tmp/pr-body-config.json \
+       --output   /tmp/pr-body.md
+     ```
+     If the script exits non-zero, **stop and fix the config** — do not fall back to hand-writing the body.
+
+  3. **Show the verification proof** to the user before proceeding. Paste the script's stdout (which reports preserved/ticked counts) into the summary in step 2.
+
+  4. **Run an external diff check** as a second guard. The output must be empty:
+     ```bash
+     diff \
+       <(grep -c '^[[:space:]]*[-*][[:space:]]*\[' <TEMPLATE>) \
+       <(grep -c '^[[:space:]]*[-*][[:space:]]*\[' /tmp/pr-body.md)
+     ```
+     If the diff is non-empty, halt — do not run `gh pr create`.
+
+  **Checkbox rules (enforced by the script, repeated here for clarity):**
+  - All checkbox lines from the template are preserved verbatim.
+  - Only checkboxes whose label matches a `checks` substring are ticked.
+  - For mutually exclusive checkbox groups, list exactly one matching substring in `checks`.
+
   Example (mutually exclusive PR type):
-  - Before: `- [ ] Bug fix` `- [ ] Feature` `- [ ] Chore`
-  - After:  `- [ ] Bug fix` `- [x] Feature` `- [ ] Chore`
+  - Template: `- [ ] Bug fix` `- [ ] Feature` `- [ ] Chore`
+  - Config:   `"checks": ["Feature"]`
+  - Output:   `- [ ] Bug fix` `- [x] Feature` `- [ ] Chore`
 - Draft status (optional): use a select box — options: `Yes (draft)` | `No (ready for review)` | `None — skip (default: No)`.
 - Assignee: always set to the PR creator (`@me`).
 - Assign reviewers (optional): use a select box populated with suggested reviewers (from git history or CODEOWNERS if available); always include **"None — no reviewers"** as an option; if selected or no input, omit `--reviewer`.
