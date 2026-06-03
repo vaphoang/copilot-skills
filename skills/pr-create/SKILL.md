@@ -2,7 +2,7 @@
 name: pr-create
 description: |
   Create a new pull request in a GitHub repository.
-version: 1.5.0
+version: 1.6.0
 triggers:
   - create pr
   - create pull request
@@ -65,25 +65,43 @@ gh auth login
 
   You **must** use `skills/pr-create/pr-body-fill.sh` to produce the body. Hand-writing the body is not permitted because it cannot guarantee checkbox preservation.
 
+  0. **Read the template and extract its instructions** before writing anything.
+     ```bash
+     cat <PATH_TO_TEMPLATE>
+     ```
+     For every section, identify:
+     - **HTML comments** (`<!-- ... -->`): these are authoring instructions — follow them literally when deciding what to write. Examples:
+       - `<!-- Describe what changed and why -->` → write a why-focused description.
+       - `<!-- Link to the Jira/GitHub issue -->` → include a link if one is known.
+       - `<!-- Add screenshots for UI changes -->` → include screenshots or note "N/A — no UI changes".
+       - `<!-- Delete this section if not applicable -->` → set `"omit": true` for that section if it genuinely does not apply.
+     - **Placeholder text** (e.g., `[Your description here]`, `_Describe…_`) → replace with real content.
+     - **Conditional instructions** (e.g., "Fill in only one of the following") → honour them when picking checkbox ticks.
+     HTML comments are instructions for the author; pass `--strip-comments` so they are removed from the reviewer-facing output.
+
   1. **Build a config JSON** at `/tmp/pr-body-config.json` with the sections you want filled and the checkbox labels you want ticked:
      ```json
      {
        "sections": [
-         { "heading": "## Summary", "content": "Free-form markdown body." }
+         { "heading": "## Summary", "content": "Free-form markdown body." },
+         { "heading": "## Screenshots", "omit": true }
        ],
        "checks": ["Feature", "Tests added"]
      }
      ```
      - `heading` must match the template heading line exactly (including `##` level).
-     - `checks` are case-insensitive substrings matched against checkbox labels. Only ticked items that are clearly appropriate from confirmed context.
+     - `content` is the replacement body for the section (honours the instructions found in step 0).
+     - `"omit": true` removes the entire section and its heading when the template says "delete if not applicable".
+     - `checks` are case-insensitive substrings matched against checkbox labels; only tick items clearly appropriate from confirmed context.
      - For sections that cannot be inferred confidently, set `content` to `"TODO"` and ask focused follow-up questions.
 
-  2. **Run the script** — it copies the template, fills sections, ticks checkboxes, and aborts if any checkbox would be lost:
+  2. **Run the script** — it copies the template, follows section instructions, ticks checkboxes, strips HTML comments, and aborts if any checkbox would be lost:
      ```bash
      skills/pr-create/pr-body-fill.sh \
        --template <PATH_TO_TEMPLATE> \
        --config   /tmp/pr-body-config.json \
-       --output   /tmp/pr-body.md
+       --output   /tmp/pr-body.md \
+       --strip-comments
      ```
      If the script exits non-zero, **stop and fix the config** — do not fall back to hand-writing the body.
 
