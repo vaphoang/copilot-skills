@@ -18,9 +18,41 @@ mkdir -p "$VSCODE_DIR"
 # Detect project type
 IS_NODE=0
 IS_JAVA=0
+NODE_BOOTSTRAP_STATUS="n/a"
+JAVA_BOOTSTRAP_STATUS="n/a"
 
 [[ -f "$WORKTREE_PATH/package.json" ]] && IS_NODE=1
 [[ -f "$WORKTREE_PATH/pom.xml" ]] && IS_JAVA=1
+
+# Validate/complete bootstrap before generating workspace files.
+if [[ $IS_NODE -eq 1 ]]; then
+    NODE_BOOTSTRAP_STATUS="ok (already present)"
+    if [[ ! -d "$WORKTREE_PATH/node_modules" ]]; then
+        NODE_BOOTSTRAP_STATUS="pending"
+        command -v npm >/dev/null || { echo "❌ npm is required for Node projects" >&2; exit 1; }
+        echo "ℹ️ node_modules missing, running npm ci..."
+        if ! (cd "$WORKTREE_PATH" && npm ci --legacy-peer-deps); then
+            echo "⚠️ npm ci with --legacy-peer-deps failed, retrying without it..."
+            (cd "$WORKTREE_PATH" && npm ci) || {
+                echo "❌ npm ci failed. Bootstrap is incomplete; stop and fix before opening IDE." >&2
+                exit 1
+            }
+        fi
+        NODE_BOOTSTRAP_STATUS="ok (npm ci)"
+    fi
+    [[ -d "$WORKTREE_PATH/node_modules" ]] || { echo "❌ node_modules not found after npm ci" >&2; exit 1; }
+fi
+
+if [[ $IS_JAVA -eq 1 ]]; then
+    JAVA_BOOTSTRAP_STATUS="pending"
+    command -v mvn >/dev/null || { echo "❌ mvn is required for Maven projects" >&2; exit 1; }
+    echo "ℹ️ running mvn -q -DskipTests compile..."
+    (cd "$WORKTREE_PATH" && mvn -q -DskipTests compile) || {
+        echo "❌ mvn compile failed. Bootstrap is incomplete; stop and fix before opening IDE." >&2
+        exit 1
+    }
+    JAVA_BOOTSTRAP_STATUS="ok (mvn compile)"
+fi
 
 # Generate settings.json (basic workspace settings)
 cat > "$VSCODE_DIR/settings.json" << 'EOF'
@@ -165,6 +197,8 @@ if [[ $IS_JAVA -eq 1 ]]; then
 fi
 
 echo "✓ VSCode workspace setup complete: $VSCODE_DIR"
+echo "   Bootstrap (Node): $NODE_BOOTSTRAP_STATUS"
+echo "   Bootstrap (Java): $JAVA_BOOTSTRAP_STATUS"
 echo "   Open the worktree in VSCode: code $WORKTREE_PATH"
 echo "   Run tasks: Terminal → Run Task → (select npm/mvn task)"
 
