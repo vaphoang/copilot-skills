@@ -2,7 +2,7 @@
 name: worktrees
 description: |
   Create a ready-to-code git worktree for feature development or code review, bootstrapped and ready in <60s. Supports Node (npm) and Java (Maven) repos.
-version: 1.3.0
+version: 1.5.0
 triggers:
   - create worktree
   - new worktree
@@ -32,6 +32,8 @@ Targets: **Node (npm)** + **Java (Maven)** repos. No global dependencies beyond 
 ```bash
 command -v git >/dev/null || { echo "❌ git required"; exit 1; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "❌ must run inside a git repo/worktree"; exit 1; }
+# Required when input is PR URL/number:
+command -v gh >/dev/null || { echo "❌ gh required for PR URL/number resolution"; exit 1; }
 ```
 
 ### 1) **Feature mode: create a feature branch worktree**
@@ -93,43 +95,59 @@ git rev-parse --git-dir >/dev/null 2>&1 || { echo "❌ must run inside a git rep
 ### 2) **Review mode: check out an existing branch or PR**
 
 **Input (required):**
-- PR number (e.g., `#1234`) or branch ref (e.g., `origin/feature/auth`).
+- PR link/number (e.g., `https://github.com/org/repo/pull/1234`, `#1234`) or branch ref (e.g., `origin/feature/auth`).
 - User can optionally provide a shorthand worktree name; if not, infer from PR/branch (required prompt).
+
+Prefer `origin/<branch>` for writable review worktrees (pushes go to the correct upstream branch).
 
 **Steps:**
 
 0. **Fetch and validate ref:**
    ```bash
    git fetch origin
-   # Resolve PR number to ref or use branch ref directly
-   if [[ "$ref" =~ ^#[0-9]+$ ]]; then
-     # PR mode: resolve PR head (GitHub convention: pull/1234/head)
-     pr_num="${ref#\#}"
-     ref="pull/$pr_num/head"
+   # Resolve PR URL/number to the PR head branch (writable), not pull/*/head (detached)
+   if [[ "$ref" =~ /pull/([0-9]+) ]]; then
+     pr_num="${BASH_REMATCH[1]}"
+   elif [[ "$ref" =~ ^#([0-9]+)$ ]]; then
+     pr_num="${BASH_REMATCH[1]}"
+   fi
+
+   if [[ -n "${pr_num:-}" ]]; then
+     head_branch="$(gh pr view "$pr_num" --json headRefName --jq '.headRefName')"
+     head_owner="$(gh pr view "$pr_num" --json headRepositoryOwner --jq '.headRepositoryOwner.login')"
+     repo_owner="$(gh repo view --json owner --jq '.owner.login')"
+     repo_name="$(gh repo view --json name --jq '.name')"
+
+     if [[ "$head_owner" == "$repo_owner" ]]; then
+       git fetch origin "$head_branch"
+       ref="origin/$head_branch"
+     else
+       # Fork PR: create/use remote for the head repo and track that branch.
+       fork_remote="pr-$head_owner"
+       git remote get-url "$fork_remote" >/dev/null 2>&1 || \
+         git remote add "$fork_remote" "https://github.com/$head_owner/$repo_name.git"
+       git fetch "$fork_remote" "$head_branch"
+       ref="$fork_remote/$head_branch"
+     fi
    fi
    ```
 
-1. **Create worktree from ref (always on a local branch, never detached):**
+1. **Create worktree from ref:**
    ```bash
    worktree_path=".worktrees/<name>"
-   branch_name="<name>"
+   remote_branch="${ref#*/}"
 
-   if [[ "$ref" == origin/* ]]; then
-     # Track remote branch refs like origin/feature/auth
-     git worktree add -b "$branch_name" "$worktree_path" "$ref"
-     git -C "$worktree_path" branch --set-upstream-to="$ref" "$branch_name"
-   elif [[ "$ref" == pull/*/head ]]; then
-     # PR refs are not local branches by default; create one explicitly
-     git fetch origin "$ref"
-     git worktree add -b "$branch_name" "$worktree_path" FETCH_HEAD
+   if [[ "$ref" == */* ]]; then
+     # Writable flow: check out local branch with upstream tracking to <remote>/<branch>
+     git worktree add --track -b "$remote_branch" "$worktree_path" "$ref"
    else
-     # Non-remote refs (local branch/tag/SHA): still create a local branch to avoid detached HEAD
-     git worktree add -b "$branch_name" "$worktree_path" "$ref"
+     # Local branch refs stay on that branch
+     git worktree add "$worktree_path" "$ref"
    fi
 
    cd "$worktree_path"
    ```
-   This guarantees the worktree opens on a local branch instead of detached HEAD.
+   - For PR links/numbers and remote refs, pushes go to the tracked upstream branch immediately.
 
 2. **Auto-detect and bootstrap (fail-fast):**
    - Same as feature mode (Node: `npm ci`, Java: `mvn -q -DskipTests compile`).
@@ -146,7 +164,8 @@ git rev-parse --git-dir >/dev/null 2>&1 || { echo "❌ must run inside a git rep
    | Field | Value |
    |-------|-------|
    | **Path** | `.worktrees/review-pr-1234` |
-   | **Ref** | `pull/1234/head` |
+   | **Ref** | `origin/feature/auth` |
+   | **Upstream** | `origin/feature/auth` (or `pr-<owner>/<branch>` for fork PRs) |
    | **Bootstrap** | `npm ci` ✓ |
    | **IDEs** | IntelliJ ✓ + VSCode ✓ |
    | **Next (IntelliJ)** | `File → Open → .worktrees/review-pr-1234` |
@@ -203,6 +222,7 @@ worktrees cleanup --force
 - Refuse if not in a git repo (check `.git/`).
 - Refuse if worktree path already exists (ask user to clean up first).
 - Show full branch name before checkout; user must confirm (required prompt for feature mode).
+- In review mode, resolve PR URL/number to the PR head branch and track that remote branch (do not use detached `pull/*/head`).
 - For cleanup: only prune worktrees with broken refs or stale lock files, never force-remove active worktrees.
 
 ## Pitfalls
