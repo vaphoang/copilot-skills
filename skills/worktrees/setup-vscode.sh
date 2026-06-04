@@ -8,8 +8,8 @@ set -euo pipefail
 WORKTREE_PATH="${1:-.}"
 VSCODE_DIR="$WORKTREE_PATH/.vscode"
 
-if [[ ! -d "$WORKTREE_PATH/.git" ]]; then
-    echo "❌ Not a git worktree: $WORKTREE_PATH" >&2
+if ! git -C "$WORKTREE_PATH" rev-parse --git-dir > /dev/null 2>&1; then
+    echo "❌ Not a valid git repo or worktree: $WORKTREE_PATH" >&2
     exit 1
 fi
 
