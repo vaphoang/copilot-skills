@@ -2,7 +2,7 @@
 name: pr-create
 description: |
   Create a new pull request in a GitHub repository.
-version: 1.6.0
+version: 1.10.0
 triggers:
   - create pr
   - create pull request
@@ -36,7 +36,18 @@ gh auth login
 ## Interaction Rules
 
 - **Optional prompts**: whenever a field is optional (user may skip it), present it as a select box using `ask_questions` with predefined options. Always include **"None — skip this"** as the first or last option. Never rely on the user leaving a field blank to signal "skip".
-- **Required prompts**: show the auto-generated or detected value and ask the user to confirm, edit, or replace it.
+- **Required prompts**: show the auto-generated or detected value and ask the user to confirm, edit, or replace it (except PR title, which is auto-generated and used directly).
+- **Low-interaction flow (mandatory)**: do not ask for a final pre-create confirmation; create the PR immediately after required inputs are resolved.
+- **Generated text style (mandatory)**: keep all AI-generated text concise and easy to scan.
+  - Prefer short bullets over paragraphs.
+  - Use markdown tables when they make structured content easier to scan.
+  - Best-fit for tables: metadata, before/after, status, decisions, and checklist-like fields.
+  - Keep tables compact (short cells, <=6 rows when possible); if content is narrative, use bullets instead.
+  - Keep each bullet to one idea and one line when possible.
+  - Avoid filler, repetition, and generic phrasing.
+  - Use plain language with concrete facts (what changed, why, impact).
+  - For section content, target 2-5 bullets unless the template requires otherwise.
+  - For long templates, include only high-signal details and use `TODO` for missing confirmed info.
 
 ## Procedure
 
@@ -55,7 +66,7 @@ gh auth login
 - Current repository (auto-detected or provided).
 - Base branch (default: repository's default branch, usually `main`, `master`, or `develop`).
 - Head branch (current branch or specified branch).
-- Title (required): auto-generate a succinct title (≤72 chars, imperative mood, no trailing period) from the branch name, commit messages, and changed files; present it to the user for confirmation or edit before proceeding.
+- Title: auto-generate a succinct title (<=72 chars, imperative mood, no trailing period) from the branch name, commit messages, and changed files; do not prompt for confirmation before creating the PR. The user can edit the title later.
 - Body/description:
   - In every session, check whether a PR template exists (for example: `.github/PULL_REQUEST_TEMPLATE.md`, `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, or `docs/PULL_REQUEST_TEMPLATE.md`).
   - If a template exists, follow the **copy-then-edit** workflow below. **Never write the body from scratch or memory.**
@@ -90,7 +101,7 @@ gh auth login
      }
      ```
      - `heading` must match the template heading line exactly (including `##` level).
-     - `content` is the replacement body for the section (honours the instructions found in step 0).
+        - `content` is the replacement body for the section (honours the instructions found in step 0) and must follow the concise style rules above.
      - `"omit": true` removes the entire section and its heading when the template says "delete if not applicable".
      - `checks` are case-insensitive substrings matched against checkbox labels; only tick items clearly appropriate from confirmed context.
      - For sections that cannot be inferred confidently, set `content` to `"TODO"` and ask focused follow-up questions.
@@ -124,17 +135,17 @@ gh auth login
   - Template: `- [ ] Bug fix` `- [ ] Feature` `- [ ] Chore`
   - Config:   `"checks": ["Feature"]`
   - Output:   `- [ ] Bug fix` `- [x] Feature` `- [ ] Chore`
-- Draft status (optional): use a select box — options: `Yes (draft)` | `No (ready for review)` | `None — skip (default: No)`.
 - Assignee: always set to the PR creator (`@me`).
-- Assign reviewers (optional): use a select box populated with suggested reviewers (from git history or CODEOWNERS if available); always include **"None — no reviewers"** as an option; if selected or no input, omit `--reviewer`.
+- Draft status: always create the PR as draft; do not prompt the user.
+- Assign reviewers: do not prompt the user and do not pass `--reviewer`; reviewers are assigned automatically.
 - Assign labels (optional): use a select box populated with available repo labels if detectable; always include **"None — no labels"** as an option; if selected or no input, omit `--label`.
 
-2) **Show user a summary before creating**.
-- Display repo, base, head, title, body, draft status, assignee (`@me`), reviewers, and labels.
+2) **Show user a summary and create**.
+- Display repo, base, head, title, body, draft status, assignee (`@me`), and labels in a compact, skimmable format.
+- Prefer a small markdown table for PR metadata (repo/base/head/title/draft/assignee/labels) when it improves readability.
+- Keep the pre-create summary short: prefer bullets/checklist and avoid repeating full body text when not needed.
 - If a template was used, show what was auto-filled and what still needs user input.
-- Ask for confirmation: `Create PR with the above details? [y/N]`
-- If the response is unclear or empty, ask one clarification; if still unclear, treat as `N` (do not create).
-- If user declines, do not create anything.
+- Do not ask `Create PR with the above details? [y/N]`; proceed directly to creation.
 
 3) **Create the PR using `gh`**.
 
@@ -144,10 +155,9 @@ gh pr create \
   --head HEAD_BRANCH \
   --title "PR Title" \
   --body-file PR_BODY_FILE \
-  --assignee "@me"
+  --assignee "@me" \
+  --draft
 # Optional flags (include only if user selected them):
-# --draft \
-# --reviewer reviewer1,reviewer2 \
 # --label label1,label2
 ```
 
@@ -159,7 +169,6 @@ gh pr create \
 
 ## Safety Rules
 
-- Never create a PR without user confirmation.
 - If base and head are the same, ask for clarification before proceeding.
 - Do not create a PR if the user has not authenticated with `gh auth login`.
 
