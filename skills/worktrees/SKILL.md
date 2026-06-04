@@ -2,7 +2,7 @@
 name: worktrees
 description: |
   Create a ready-to-code git worktree for feature development or code review, bootstrapped and ready in <60s. Supports Node (npm) and Java (Maven) repos.
-version: 1.1.0
+version: 1.2.0
 triggers:
   - create worktree
   - new worktree
@@ -31,7 +31,7 @@ Targets: **Node (npm)** + **Java (Maven)** repos. No global dependencies beyond 
 
 ```bash
 command -v git >/dev/null || { echo "❌ git required"; exit 1; }
-[[ -d .git ]] || { echo "❌ must run from repo root"; exit 1; }
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "❌ must run inside a git repo/worktree"; exit 1; }
 ```
 
 ### 1) **Feature mode: create a feature branch worktree**
@@ -55,7 +55,9 @@ command -v git >/dev/null || { echo "❌ git required"; exit 1; }
    git worktree add "$worktree_path" --no-checkout
    cd "$worktree_path"
    git checkout -b "<branch-name>" "origin/<base-branch>"
+   git branch --set-upstream-to "origin/<base-branch>" "<branch-name>"
    ```
+   This sets upstream immediately so `git pull` works right away.
 
 2. **Auto-detect and bootstrap (fail-fast):**
    - **Node**: If `package.json` exists:
@@ -112,6 +114,10 @@ command -v git >/dev/null || { echo "❌ git required"; exit 1; }
    worktree_path=".worktrees/<name>"
    git worktree add "$worktree_path" "$ref"
    cd "$worktree_path"
+   # If the ref is a remote branch, track it so git pull works immediately.
+   if [[ "$ref" == origin/* ]]; then
+     git branch --set-upstream-to="$ref" "$(git rev-parse --abbrev-ref HEAD)"
+   fi
    ```
 
 2. **Auto-detect and bootstrap (fail-fast):**
