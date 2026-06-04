@@ -2,7 +2,7 @@
 name: worktrees
 description: |
   Create a ready-to-code git worktree for feature development or code review, bootstrapped and ready in <60s. Supports Node (npm) and Java (Maven) repos.
-version: 1.2.0
+version: 1.3.0
 triggers:
   - create worktree
   - new worktree
@@ -103,22 +103,33 @@ git rev-parse --git-dir >/dev/null 2>&1 || { echo "❌ must run inside a git rep
    git fetch origin
    # Resolve PR number to ref or use branch ref directly
    if [[ "$ref" =~ ^#[0-9]+$ ]]; then
-     # PR mode: resolve to merge branch (GitHub convention: pull/1234/head)
+     # PR mode: resolve PR head (GitHub convention: pull/1234/head)
      pr_num="${ref#\#}"
      ref="pull/$pr_num/head"
    fi
    ```
 
-1. **Create worktree from ref:**
+1. **Create worktree from ref (always on a local branch, never detached):**
    ```bash
    worktree_path=".worktrees/<name>"
-   git worktree add "$worktree_path" "$ref"
-   cd "$worktree_path"
-   # If the ref is a remote branch, track it so git pull works immediately.
+   branch_name="<name>"
+
    if [[ "$ref" == origin/* ]]; then
-     git branch --set-upstream-to="$ref" "$(git rev-parse --abbrev-ref HEAD)"
+     # Track remote branch refs like origin/feature/auth
+     git worktree add -b "$branch_name" "$worktree_path" "$ref"
+     git -C "$worktree_path" branch --set-upstream-to="$ref" "$branch_name"
+   elif [[ "$ref" == pull/*/head ]]; then
+     # PR refs are not local branches by default; create one explicitly
+     git fetch origin "$ref"
+     git worktree add -b "$branch_name" "$worktree_path" FETCH_HEAD
+   else
+     # Non-remote refs (local branch/tag/SHA): still create a local branch to avoid detached HEAD
+     git worktree add -b "$branch_name" "$worktree_path" "$ref"
    fi
+
+   cd "$worktree_path"
    ```
+   This guarantees the worktree opens on a local branch instead of detached HEAD.
 
 2. **Auto-detect and bootstrap (fail-fast):**
    - Same as feature mode (Node: `npm ci`, Java: `mvn -q -DskipTests compile`).
