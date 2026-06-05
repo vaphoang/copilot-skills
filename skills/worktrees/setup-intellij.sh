@@ -27,6 +27,22 @@ JAVA_BOOTSTRAP_STATUS="n/a"
 # Validate/complete bootstrap before generating IDE files.
 if [[ $IS_NODE -eq 1 ]]; then
     NODE_BOOTSTRAP_STATUS="ok (already present)"
+
+    # For monorepos with npm workspaces: install root hoisted dependencies first
+    if grep -q '"workspaces"' "$WORKTREE_PATH/../../../package.json" 2>/dev/null; then
+        repo_root="$(git -C "$WORKTREE_PATH" rev-parse --show-toplevel)"
+        if [[ ! -d "$repo_root/node_modules" ]]; then
+            echo "ℹ️ monorepo detected: installing root dependencies first..."
+            if ! (cd "$repo_root" && npm ci --legacy-peer-deps); then
+                echo "⚠️ npm ci with --legacy-peer-deps failed at root, retrying without it..."
+                (cd "$repo_root" && npm ci) || {
+                    echo "❌ root npm ci failed. Cannot proceed." >&2
+                    exit 1
+                }
+            fi
+        fi
+    fi
+
     if [[ ! -d "$WORKTREE_PATH/node_modules" ]]; then
         NODE_BOOTSTRAP_STATUS="pending"
         command -v npm >/dev/null || { echo "❌ npm is required for Node projects" >&2; exit 1; }

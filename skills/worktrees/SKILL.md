@@ -2,7 +2,7 @@
 name: worktrees
 description: |
   Create a ready-to-code git worktree for feature development or code review, bootstrapped and ready in <60s. Supports Node (npm) and Java (Maven) repos.
-version: 1.6.0
+version: 1.7.0
 triggers:
   - create worktree
   - new worktree
@@ -71,6 +71,11 @@ mkdir -p "$worktree_root"
 2. **Auto-detect and bootstrap (fail-fast):**
    - **Node**: If `package.json` exists:
      ```bash
+     # For monorepos with workspaces: install root dependencies first
+     if grep -q '"workspaces"' "$repo_root/package.json"; then
+       (cd "$repo_root" && npm ci --legacy-peer-deps || cd "$repo_root" && npm ci)
+     fi
+     # Then install worktree-specific dependencies
      npm ci --legacy-peer-deps || npm ci
      ```
    - **Java**: If `pom.xml` exists:
@@ -159,6 +164,7 @@ Prefer `origin/<branch>` for writable review worktrees (pushes go to the correct
 2. **Auto-detect and bootstrap (fail-fast):**
    - Same as feature mode (Node: `npm ci`, Java: `mvn -q -DskipTests compile`).
    - If bootstrap fails, stop and surface the error; do not continue to IDE setup.
+   - For monorepos, root dependencies (hoisted eslint, etc.) are installed first.
 
 3. **Auto-generate IDE project metadata:**
    Same as feature mode — auto-generate both IntelliJ and VSCode:
