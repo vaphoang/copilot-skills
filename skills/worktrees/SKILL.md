@@ -2,7 +2,7 @@
 name: worktrees
 description: |
   Create a ready-to-code git worktree for feature development or code review, bootstrapped and ready in <60s. Supports Node (npm) and Java (Maven) repos.
-version: 1.5.0
+version: 1.6.0
 triggers:
   - create worktree
   - new worktree
@@ -17,11 +17,12 @@ Quick-create isolated worktrees for feature development or code review with auto
 
 ## Overview
 
-Creates a git worktree at `.worktrees/<name>`, auto-detects project type (Node/Java), runs minimal bootstrap (`npm ci` / `mvn compile`), and leaves you ready to code in one command.
+Creates a git worktree at a configurable path. Default root is outside the repo (`$HOME/.worktrees/<repo-name>/<name>`) to avoid parent-folder `node_modules` interference. Then it auto-detects project type (Node/Java), runs minimal bootstrap (`npm ci` / `mvn compile`), and leaves you ready to code in one command.
 
 - **Feature mode:** creates fresh branch from base, names it `<user>/<ticket>-<slug>`.
 - **Review mode:** checks out an existing branch or PR ref.
 - **Cleanup:** auto-prune stale worktrees with `--force`.
+- **Location:** default outside-repo root (`$HOME/.worktrees/<repo-name>`). Override with `WORKTREE_ROOT`.
 
 Targets: **Node (npm)** + **Java (Maven)** repos. No global dependencies beyond `git` and `bash`.
 
@@ -34,6 +35,12 @@ command -v git >/dev/null || { echo "❌ git required"; exit 1; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "❌ must run inside a git repo/worktree"; exit 1; }
 # Required when input is PR URL/number:
 command -v gh >/dev/null || { echo "❌ gh required for PR URL/number resolution"; exit 1; }
+
+repo_root="$(git rev-parse --show-toplevel)"
+repo_name="$(basename "$repo_root")"
+# Default outside repo to isolate dependency trees like node_modules
+worktree_root="${WORKTREE_ROOT:-$HOME/.worktrees/$repo_name}"
+mkdir -p "$worktree_root"
 ```
 
 ### 1) **Feature mode: create a feature branch worktree**
@@ -53,7 +60,7 @@ command -v gh >/dev/null || { echo "❌ gh required for PR URL/number resolution
 
 1. **Create and check out worktree:**
    ```bash
-   worktree_path=".worktrees/<branch-name>"
+   worktree_path="$worktree_root/<branch-name>"
    git worktree add "$worktree_path" --no-checkout
    cd "$worktree_path"
    git checkout -b "<branch-name>" "origin/<base-branch>"
@@ -76,8 +83,8 @@ command -v gh >/dev/null || { echo "❌ gh required for PR URL/number resolution
 3. **Auto-generate IDE project metadata:**
    Both IntelliJ and VSCode ready automatically:
    ```bash
-   bash ../../../skills/worktrees/setup-intellij.sh "$worktree_path"
-   bash ../../../skills/worktrees/setup-vscode.sh "$worktree_path"
+   bash "$repo_root/skills/worktrees/setup-intellij.sh" "$worktree_path"
+   bash "$repo_root/skills/worktrees/setup-vscode.sh" "$worktree_path"
    ```
    - IntelliJ: Generates `.idea/` with run configurations
    - VSCode: Generates `.vscode/` with tasks and recommended extensions
@@ -85,12 +92,12 @@ command -v gh >/dev/null || { echo "❌ gh required for PR URL/number resolution
 4. **Show summary (table format):**
    | Field | Value |
    |-------|-------|
-   | **Path** | `.worktrees/ph/GH-1234-jwt-refresh` |
+   | **Path** | `~/.worktrees/<repo>/ph/GH-1234-jwt-refresh` |
    | **Branch** | `ph/GH-1234-jwt-refresh` (new from `main`) |
    | **Bootstrap** | `npm ci` ✓ |
    | **IDEs** | IntelliJ ✓ + VSCode ✓ |
-   | **Next (IntelliJ)** | `File → Open → .worktrees/ph/GH-1234-jwt-refresh` |
-   | **Next (VSCode)** | `code .worktrees/ph/GH-1234-jwt-refresh` |
+   | **Next (IntelliJ)** | `File → Open → ~/.worktrees/<repo>/ph/GH-1234-jwt-refresh` |
+   | **Next (VSCode)** | `code ~/.worktrees/<repo>/ph/GH-1234-jwt-refresh` |
 
 ### 2) **Review mode: check out an existing branch or PR**
 
@@ -134,7 +141,7 @@ Prefer `origin/<branch>` for writable review worktrees (pushes go to the correct
 
 1. **Create worktree from ref:**
    ```bash
-   worktree_path=".worktrees/<name>"
+   worktree_path="$worktree_root/<name>"
    remote_branch="${ref#*/}"
 
    if [[ "$ref" == */* ]]; then
@@ -156,20 +163,20 @@ Prefer `origin/<branch>` for writable review worktrees (pushes go to the correct
 3. **Auto-generate IDE project metadata:**
    Same as feature mode — auto-generate both IntelliJ and VSCode:
    ```bash
-   bash ../../../skills/worktrees/setup-intellij.sh "$worktree_path"
-   bash ../../../skills/worktrees/setup-vscode.sh "$worktree_path"
+   bash "$repo_root/skills/worktrees/setup-intellij.sh" "$worktree_path"
+   bash "$repo_root/skills/worktrees/setup-vscode.sh" "$worktree_path"
    ```
 
 4. **Show summary:**
    | Field | Value |
    |-------|-------|
-   | **Path** | `.worktrees/review-pr-1234` |
+   | **Path** | `~/.worktrees/<repo>/review-pr-1234` |
    | **Ref** | `origin/feature/auth` |
    | **Upstream** | `origin/feature/auth` (or `pr-<owner>/<branch>` for fork PRs) |
    | **Bootstrap** | `npm ci` ✓ |
    | **IDEs** | IntelliJ ✓ + VSCode ✓ |
-   | **Next (IntelliJ)** | `File → Open → .worktrees/review-pr-1234` |
-   | **Next (VSCode)** | `code .worktrees/review-pr-1234` |
+   | **Next (IntelliJ)** | `File → Open → ~/.worktrees/<repo>/review-pr-1234` |
+   | **Next (VSCode)** | `code ~/.worktrees/<repo>/review-pr-1234` |
 
 ### 3) **Cleanup: remove stale worktrees**
 
@@ -198,9 +205,9 @@ worktrees cleanup --force
 3. **Show what was removed:**
    ```bash
    ✓ Removed 3 stale worktrees:
-     - .worktrees/ph/old-feature
-     - .worktrees/review-pr-1099
-     - .worktrees/experiment-xyz
+     - ~/.worktrees/<repo>/ph/old-feature
+     - ~/.worktrees/<repo>/review-pr-1099
+     - ~/.worktrees/<repo>/experiment-xyz
    ```
 
 ## Interaction Rules
@@ -219,7 +226,7 @@ worktrees cleanup --force
 
 ## Safety Rules
 
-- Refuse if not in a git repo (check `.git/`).
+- Refuse if not in a git repo/worktree (`git rev-parse --git-dir`).
 - Refuse if worktree path already exists (ask user to clean up first).
 - Show full branch name before checkout; user must confirm (required prompt for feature mode).
 - In review mode, resolve PR URL/number to the PR head branch and track that remote branch (do not use detached `pull/*/head`).
@@ -229,7 +236,7 @@ worktrees cleanup --force
 
 - **Node monorepos:** `npm ci` at repo root may not be enough; consider `--workspaces` or ask user for workspace path.
 - **Maven multi-module:** `mvn compile` compiles all modules; if repo has many, this may be slow. No optimization in v1.
-- **Worktree name collisions:** if `.worktrees/name` exists, ask user to pick a different name or clean up first.
+- **Worktree name collisions:** if `$WORKTREE_ROOT/name` exists, ask user to pick a different name or clean up first.
 - **Branch naming drift:** if repo has different conventions (e.g., `feature/ticket-slug` instead of `user/ticket-slug`), document this in repo `.worktree.yml` for v1.1+.
 
 ## Examples
@@ -246,9 +253,9 @@ worktree feature \
 Output:
 ```
 ✓ Branch: phoang/GH-1234-auth-refresh
-✓ Worktree: .worktrees/phoang/GH-1234-auth-refresh
+✓ Worktree: ~/.worktrees/<repo>/phoang/GH-1234-auth-refresh
 ✓ Bootstrap: npm ci ✓
-Next: cd .worktrees/phoang/GH-1234-auth-refresh && npm test
+Next: cd ~/.worktrees/<repo>/phoang/GH-1234-auth-refresh && npm test
 ```
 
 ### Review: Check out PR #999
@@ -260,10 +267,10 @@ worktree review \
 
 Output:
 ```
-✓ Ref: pull/999/head
-✓ Worktree: .worktrees/review-pr-999
+✓ Ref: origin/feature/auth
+✓ Worktree: ~/.worktrees/<repo>/review-pr-999
 ✓ Bootstrap: mvn -q -DskipTests compile ✓
-Next: cd .worktrees/review-pr-999 && mvn test
+Next: cd ~/.worktrees/<repo>/review-pr-999 && mvn test
 ```
 
 ### Cleanup stale worktrees
@@ -275,8 +282,8 @@ worktree cleanup --force
 Output:
 ```
 ✓ Pruned 2 stale worktrees:
-  .worktrees/ph/old-experiment
-  .worktrees/review-pr-888
+  ~/.worktrees/<repo>/ph/old-experiment
+  ~/.worktrees/<repo>/review-pr-888
 ```
 
 ## Future (v1.1+)
